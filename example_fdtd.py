@@ -33,6 +33,7 @@ grid = fdtd.Grid(
     permittivity=1.0,
 )
 
+
 #Add dielectric
 #grid[5:-5,5:-5,start_vert+5e-6: start_vert + 75e-6] = fdtd.Object(permittivity=dielectric_const, name="dielectric")
 grid[pml_size:-pml_size,\
@@ -61,7 +62,7 @@ grid[outer_dim_x / 2\
         air_size:microstrip_vertical_start + conductor_thickness]\
         = fdtd.LineSource(period = 1/max_freq, name="source")
 
-#Add detector at far right side (Port 1)
+#Add detector at far left side (Port 1)
 grid[outer_dim_x/2,\
         pml_size +1,\
         microstrip_vertical_start + conductor_thickness]\
@@ -76,61 +77,38 @@ grid[outer_dim_x /2,\
 #Box of size 2
 DomainBorderPML(grid, pml_size)  
 
-grid.run(total_time=1000)
+#TODO run while field quantities are above certain threshold
+grid.run(total_time=10)
+#grid.run(total_time=10)
 
 grid.visualize(z=12, show=True)
 grid.visualize(x=0, show=True)
 grid.visualize(y=0, show=True)
 
-#print(sum(grid.detectors[1].detector_values()["E"]))
-#print(sum(grid.detectors[1].detector_values()["H"]))
-
-
+#Get E and H field from port 2
 E_2_t_unitless = grid.detectors[1].detector_values()["E"]
 H_2_t_unitless = grid.detectors[1].detector_values()["H"]
 
-print(sum(E_2_t_unitless))
-print(sum(H_2_t_unitless))
-
+#Normalize field quantities
 E_2_t = [simE_to_worldE(x) for x in E_2_t_unitless]
 H_2_t = [simH_to_worldH(x) for x in H_2_t_unitless]
 
-print(sum(E_2_t))
-print(sum(H_2_t))
-
-#print(simE_to_worldE(sum(E_2_t_unitless)))
-#print(simH_to_worldH(sum(H_2_t_unitless)))
-
+#Plot E field at port 2
 E_2_t_x =[x[0] for x in E_2_t]
 plt.plot(range(len(E_2_t_x)), E_2_t_x)
+plt.title('Port 2 E field.')
 plt.show()
 
-#E_2_t_y =[y[1] for y in E_2_t]
-#plt.plot(range(len(E_2_t_y)), E_2_t_y)
-#plt.show()
-#
-#E_2_t_y =[z[2] for z in E_2_t]
-#plt.plot(range(len(E_2_t_z)), E_2_t_z)
-#plt.show()
-
-
-
-
+#Fetch field quantities from port 1
 E_1_t_unitless = grid.detectors[0].detector_values()["E"]
 H_1_t_unitless = grid.detectors[0].detector_values()["H"]
 
-print(sum(E_1_t_unitless))
-print(sum(H_1_t_unitless))
-
+#Normalize port 1 field quantities
 E_1_t = [simE_to_worldE(x) for x in E_1_t_unitless]
 H_1_t = [simH_to_worldH(x) for x in H_1_t_unitless]
 
-print(sum(E_1_t))
-print(sum(H_1_t))
-
-#print(simE_to_worldE(sum(E_2_t_unitless)))
-#print(simH_to_worldH(sum(H_2_t_unitless)))
-
+#Plot port 1 e field
 E_1_t_x =[x[0] for x in E_1_t]
 plt.plot(range(len(E_1_t_x)), E_1_t_x)
+plt.title('Port 1 E field.')
 plt.show()
