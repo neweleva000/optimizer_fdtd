@@ -33,16 +33,13 @@ grid = fdtd.Grid(
     permittivity=1.0,
 )
 
-
 #Add dielectric
-#grid[5:-5,5:-5,start_vert+5e-6: start_vert + 75e-6] = fdtd.Object(permittivity=dielectric_const, name="dielectric")
 grid[pml_size:-pml_size,\
         pml_size:-pml_size,\
         air_size + conductor_thickness: air_size + conductor_thickness + dielectric_thickness]\
         = fdtd.Object(permittivity=dielectric_const, name="dielectric")
 
 #Add microstrip line 
-#grid[230e-6:270e-6, 5:-5, start_vert+75e-6:start_vert +80e-6] = fdtd.AbsorbingObject(permittivity=1, conductivity=5.8e8, name="conductor")
 microstrip_vertical_start = air_size + dielectric_thickness + conductor_thickness 
 grid[outer_dim_x/2 - microstrip_width/2:outer_dim_x/2 + microstrip_width/2,\
         pml_size:-pml_size,\
@@ -63,15 +60,15 @@ grid[outer_dim_x / 2\
         = fdtd.LineSource(period = 1/max_freq, name="source")
 
 #Add detector at far left side (Port 1)
-grid[outer_dim_x/2,\
+grid[outer_dim_x/2 - microstrip_width/2:outer_dim_x/2 + microstrip_width/2,\
         pml_size +1,\
-        microstrip_vertical_start + conductor_thickness]\
+        microstrip_vertical_start:microstrip_vertical_start + conductor_thickness]\
         = fdtd.LineDetector(name="port1")
 
 #Add detector at far right side (Port 2)
-grid[outer_dim_x /2,\
+grid[outer_dim_x/2 - microstrip_width/2:outer_dim_x/2 + microstrip_width/2,\
         -pml_size -1,\
-        microstrip_vertical_start + conductor_thickness]\
+        microstrip_vertical_start:microstrip_vertical_start + conductor_thickness]\
         = fdtd.LineDetector(name="port2")
 
 #Box of size 2
