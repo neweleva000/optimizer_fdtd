@@ -3,8 +3,52 @@ import fdtd
 import numpy as np
 from math import sqrt, ceil, floor
 from fdtd.boundaries import DomainBorderPML
+from fdtd.boundaries import PML
 from fdtd.conversions import simE_to_worldE, simH_to_worldH, const
 from matplotlib import pyplot as plt
+
+#import sys
+#sys.path.append('../fdtd/fdtd/')
+#from fdtd.sources import SoftArbitraryPointSource
+
+def bound_check_avg(field, num_avg):
+    avg = 0
+    for i in range(num_avg):
+        avg += np.abs(field[i])
+    return avg/num_avg
+
+
+def gaussian_pulse(period: float, width: float, num_steps: int, amplitude: float = 1.0) -> np.ndarray:
+    """
+    Generate a Gaussian pulse centered in the time window.
+
+    Parameters:
+    - period (float): Time between peaks (used to center the pulse).
+    - width (float): Width (standard deviation) of the Gaussian envelope.
+    - num_steps (int): Number of discrete time steps.
+    - amplitude (float): Maximum amplitude of the pulse.
+
+    Returns:
+    - np.ndarray: 1D array representing the Gaussian pulse over time.
+    """
+    t = np.arange(num_steps)
+    t0 = period / 2.0  # Center the pulse around half the period
+    pulse = amplitude * np.exp(-((t - t0) ** 2) / (2 * width ** 2))
+    return pulse
+
+
+def CustomDomainBorder(grid, border_cells, stability=1e-8, extra_z=0):
+    #top and bottom
+    grid[:, : ,0:border_cells] = PML(a=stability)
+    grid[:, : ,-border_cells-extra_z:] = PML(a=stability)
+
+    #left and right
+    grid[0:border_cells, :, border_cells:-border_cells] = PML(a=stability)
+    grid[-border_cells:, :, border_cells:-border_cells] = PML(a=stability)
+
+    #front and back
+    grid[border_cells:-border_cells, 0:border_cells, border_cells:-border_cells] = PML(a=stability)
+    grid[border_cells:-border_cells, -border_cells:, border_cells:-border_cells] = PML(a=stability)
 
 #Calculates the poynting vector of E and H phasors as:
 #S= 1/2 Re{E x H*}
@@ -73,7 +117,8 @@ fdtd.set_backend("numpy")
 
 #TODO scale wavelength up by e6 and make everything in meters?
 
-min_run_time = 1000
+min_run_time = 30000 #This is where it appears to level off
+run_time_step = 500
 
 #Constants
 dielectric_const = 4
@@ -87,21 +132,21 @@ outer_dim_x_conductor = 500e-6
 outer_dim_y_conductor = 500e-6
 dielectric_thickness = 70e-6
 start_vert = 50e-6
-air_grid_pt = 10
+air_grid_pt = 5
 air_size = grid_sp * air_grid_pt  #Amount of air material between boundaries and conductor in vertical dimension
-conductor_thickness = grid_sp# 0.01 * WAVELENGTH
+conductor_thickness = grid_sp
 vertical_len = air_size + dielectric_thickness + 2 * conductor_thickness #2 layer stackup
-pml_size = 8
+pml_size = 5
 microstrip_width = 40e-6
 outer_dim_x = outer_dim_x_conductor + 2 * pml_size * grid_sp
 outer_dim_y = outer_dim_y_conductor + 2 * pml_size * grid_sp
-#conductor_start = grid_sp * air_grid_pt + pml_size * grid_sp
 conductor_start = pml_size * grid_sp
+extra_z_pml = 10
 
 grid = fdtd.Grid(
     shape = (ceil(outer_dim_x_conductor/grid_sp) + 2*pml_size,\
             ceil(outer_dim_y_conductor/grid_sp) + 2*pml_size,\
-            ceil(vertical_len/grid_sp) + 2*pml_size),\
+            ceil(vertical_len/grid_sp) + 2*pml_size + extra_z_pml),\
     grid_spacing=grid_sp,
     permittivity=1.0)
 
@@ -142,45 +187,54 @@ grid[outer_dim_x/2 - microstrip_width/2:outer_dim_x/2 + microstrip_width/2,\
 
 
 #Add source at far left side (Sx1
-#grid[outer_dim_x / 2\
-#        , pml_size + 1,\
-#        conductor_start:microstrip_vertical_start + conductor_thickness]\
-#        = fdtd.LineSource(period = 1/max_freq, name="source", pulse=True, cycle=100)
-#grid[outer_dim_x / 2 - microstrip_width: outer_dim_x/2 + microstrip_width\
-#        , pml_size + 1,\
-#        conductor_start:microstrip_vertical_start + conductor_thickness]\
-#        = fdtd.PlaneSource(period = 1/max_freq, name="source", amplitude=1, polarization='z')
-grid[outer_dim_x / 2 - microstrip_width/2: outer_dim_x/2 + microstrip_width/2\
-        , pml_size,\
+grid[outer_dim_x/2 - microstrip_width/2:outer_dim_x/2 + microstrip_width/2,\
+        pml_size,\
         microstrip_vertical_start:microstrip_vertical_start + conductor_thickness]\
         = fdtd.LineSource(period = 1/max_freq, name="source", pulse=True, cycle=1, hanning_dt=1/max_freq)
 
 #Add detector at far left side (Port 1)
 grid[outer_dim_x/2 - microstrip_width/2:outer_dim_x/2 + microstrip_width/2,\
-        pml_size,\
+        pml_size + 1,\
         microstrip_vertical_start:microstrip_vertical_start + conductor_thickness]\
         = fdtd.LineDetector(name="port1")
 
 #Add detector at far right side (Port 2)
 grid[outer_dim_x/2 - microstrip_width/2:outer_dim_x/2 + microstrip_width/2,\
-        -pml_size -1,\
+        -pml_size -3,\
         microstrip_vertical_start:microstrip_vertical_start + conductor_thickness]\
         = fdtd.LineDetector(name="port2")
 
 #Box of size 2
-DomainBorderPML(grid, pml_size)  
+CustomDomainBorder(grid, pml_size, 1e-8, extra_z_pml)  
 
-#TODO run while field quantities are above certain threshold
-#grid.run(total_time=10)
+#Run while field quantities are above certain threshold 
+#Minimum run time
 grid.run(total_time=min_run_time)
+
+#Get E and H field from port 2
+E_2_t_unitless = np.array(grid.detectors[1].detector_values()["E"])
+
+thresh = 0.05
+num_avg = run_time_step // 2
+recent_E2 = max(np.abs(E_2_t_unitless[-num_avg:, 0, 0]))
+print(recent_E2)
+print(np.max(E_2_t_unitless[:,0,0]))
+count = 0
+while(recent_E2 > thresh * np.max(E_2_t_unitless[:,0,0]) and count < 200):
+    count += 1
+    grid.run(total_time=run_time_step)
+    E_2_t_unitless = np.array(grid.detectors[1].detector_values()["E"])
+    recent_E2 = max(np.abs(E_2_t_unitless[-num_avg:, 0, 0]))
+    print(recent_E2)
+    print(np.max(E_2_t_unitless[:,0,0]))
+
+H_2_t_unitless = grid.detectors[1].detector_values()["H"]
+
 #Show setup 
 grid.visualize(z=0, show=True)
 grid.visualize(x=0, show=True)
 grid.visualize(y=0, show=True)
 
-#Get E and H field from port 2
-E_2_t_unitless = grid.detectors[1].detector_values()["E"]
-H_2_t_unitless = grid.detectors[1].detector_values()["H"]
 
 #Normalize field quantities
 E_2_t = np.array([simE_to_worldE(x) for x in E_2_t_unitless])
