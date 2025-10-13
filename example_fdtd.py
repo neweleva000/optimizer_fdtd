@@ -106,10 +106,20 @@ grid = fdtd.Grid(
     permittivity=1.0)
 
 #Add air
-grid[pml_size:-pml_size,\
+grid[pml_size:grid.shape[0]//2 - int(microstrip_width / grid_sp),\
+        pml_size:-pml_size,\
+        vertical_len - air_size +(pml_size-1) * grid_sp:vertical_len +pml_size * grid_sp]\
+        = fdtd.AbsorbingObject(permittivity=1, conductivity=0, name="air1")
+
+grid[grid.shape[0]//2 + int(microstrip_width / grid_sp):-pml_size,\
+        pml_size:-pml_size,\
+        vertical_len - air_size +(pml_size-1) * grid_sp:vertical_len +pml_size * grid_sp]\
+        = fdtd.AbsorbingObject(permittivity=1, conductivity=0, name="air2")
+
+grid[outer_dim_x/2 - microstrip_width/2:outer_dim_x/2 + microstrip_width/2,\
         pml_size:-pml_size,\
         vertical_len - air_size +pml_size * grid_sp:vertical_len +pml_size * grid_sp]\
-        = fdtd.AbsorbingObject(permittivity=1, conductivity=0, name="air")
+        = fdtd.AbsorbingObject(permittivity=1, conductivity=0, name="air3")
 
 #Add ground plane
 grid[pml_size:-pml_size,\
