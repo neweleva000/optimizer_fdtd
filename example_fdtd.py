@@ -1,5 +1,11 @@
 import pudb
-import fdtd
+#import fdtd
+
+import sys
+sys.path.append('../fdtd')
+import fdtd_local as fdtd
+
+
 import numpy as np
 from math import sqrt, ceil, floor
 from fdtd.boundaries import DomainBorderPML
@@ -117,8 +123,8 @@ fdtd.set_backend("numpy")
 
 #TODO scale wavelength up by e6 and make everything in meters?
 
-min_run_time = 30000 #This is where it appears to level off
-run_time_step = 500
+min_run_time = 1000 #This is where it appears to level off
+run_time_step = 100
 
 #Constants
 dielectric_const = 4
@@ -132,7 +138,7 @@ outer_dim_x_conductor = 500e-6
 outer_dim_y_conductor = 500e-6
 dielectric_thickness = 70e-6
 start_vert = 50e-6
-air_grid_pt = 5
+air_grid_pt = 10
 air_size = grid_sp * air_grid_pt  #Amount of air material between boundaries and conductor in vertical dimension
 conductor_thickness = grid_sp
 vertical_len = air_size + dielectric_thickness + 2 * conductor_thickness #2 layer stackup
@@ -151,20 +157,20 @@ grid = fdtd.Grid(
     permittivity=1.0)
 
 #Add air
-grid[pml_size:grid.shape[0]//2 - int(microstrip_width / grid_sp),\
-        pml_size:-pml_size,\
-        vertical_len - air_size +(pml_size-1) * grid_sp:vertical_len +pml_size * grid_sp]\
-        = fdtd.AbsorbingObject(permittivity=1, conductivity=0, name="air1")
-
-grid[grid.shape[0]//2 + int(microstrip_width / grid_sp):-pml_size,\
-        pml_size:-pml_size,\
-        vertical_len - air_size +(pml_size-1) * grid_sp:vertical_len +pml_size * grid_sp]\
-        = fdtd.AbsorbingObject(permittivity=1, conductivity=0, name="air2")
-
-grid[outer_dim_x/2 - microstrip_width/2:outer_dim_x/2 + microstrip_width/2,\
-        pml_size:-pml_size,\
-        vertical_len - air_size +pml_size * grid_sp:vertical_len +pml_size * grid_sp]\
-        = fdtd.AbsorbingObject(permittivity=1, conductivity=0, name="air3")
+#grid[pml_size:grid.shape[0]//2 - int(microstrip_width / grid_sp),\
+#        pml_size:-pml_size,\
+#        vertical_len - air_size +(pml_size-1) * grid_sp:vertical_len +pml_size * grid_sp]\
+#        = fdtd.AbsorbingObject(permittivity=1, conductivity=0, name="air1")
+#
+#grid[grid.shape[0]//2 + int(microstrip_width / grid_sp):-pml_size,\
+#        pml_size:-pml_size,\
+#        vertical_len - air_size +(pml_size-1) * grid_sp:vertical_len +pml_size * grid_sp]\
+#        = fdtd.AbsorbingObject(permittivity=1, conductivity=0, name="air2")
+#
+#grid[outer_dim_x/2 - microstrip_width/2:outer_dim_x/2 + microstrip_width/2,\
+#        pml_size:-pml_size,\
+#        vertical_len - air_size +pml_size * grid_sp:vertical_len +pml_size * grid_sp]\
+#        = fdtd.AbsorbingObject(permittivity=1, conductivity=0, name="air3")
 
 #Add ground plane
 grid[pml_size:-pml_size,\
@@ -187,14 +193,23 @@ grid[outer_dim_x/2 - microstrip_width/2:outer_dim_x/2 + microstrip_width/2,\
 
 
 #Add source at far left side (Sx1
+#grid[outer_dim_x/2 - microstrip_width/2:outer_dim_x/2 + microstrip_width/2,\
+#        pml_size,\
+#        microstrip_vertical_start:microstrip_vertical_start + conductor_thickness]\
+#        = fdtd.LineSource(period = 1/max_freq, name="source", pulse=True, cycle=10, hanning_dt=1e14/max_freq)
 grid[outer_dim_x/2 - microstrip_width/2:outer_dim_x/2 + microstrip_width/2,\
+        #grid[pml_size:-pml_size,\
+        #grid[pml_size:pml_size+20,\
         pml_size,\
+        #conductor_start:microstrip_vertical_start + conductor_thickness]\
         microstrip_vertical_start:microstrip_vertical_start + conductor_thickness]\
-        = fdtd.LineSource(period = 1/max_freq, name="source", pulse=True, cycle=1, hanning_dt=1/max_freq)
+        = fdtd.LineSource(period = 1/max_freq, name="source", pulse=True, cycle=10, hanning_dt=10.0)#/max_freq)
+
+        #pulse size = t1 = int(2 * pi / (self.frequency * self.hanning_dt / self.cycle)) ; where frequency is in step size
 
 #Add detector at far left side (Port 1)
 grid[outer_dim_x/2 - microstrip_width/2:outer_dim_x/2 + microstrip_width/2,\
-        pml_size + 1,\
+        pml_size +1,\
         microstrip_vertical_start:microstrip_vertical_start + conductor_thickness]\
         = fdtd.LineDetector(name="port1")
 
@@ -205,7 +220,12 @@ grid[outer_dim_x/2 - microstrip_width/2:outer_dim_x/2 + microstrip_width/2,\
         = fdtd.LineDetector(name="port2")
 
 #Box of size 2
-CustomDomainBorder(grid, pml_size, 1e-8, extra_z_pml)  
+CustomDomainBorder(grid, pml_size, 1e-6, extra_z_pml)  
+
+#Show setup 
+grid.visualize(z=0, show=True)
+grid.visualize(x=0, show=True)
+grid.visualize(y=0, show=True)
 
 #Run while field quantities are above certain threshold 
 #Minimum run time
@@ -214,13 +234,13 @@ grid.run(total_time=min_run_time)
 #Get E and H field from port 2
 E_2_t_unitless = np.array(grid.detectors[1].detector_values()["E"])
 
-thresh = 0.05
+thresh = 0.005
 num_avg = run_time_step // 2
 recent_E2 = max(np.abs(E_2_t_unitless[-num_avg:, 0, 0]))
 print(recent_E2)
 print(np.max(E_2_t_unitless[:,0,0]))
 count = 0
-while(recent_E2 > thresh * np.max(E_2_t_unitless[:,0,0]) and count < 200):
+while(recent_E2 > thresh * np.max(E_2_t_unitless[:,0,0]) and count < 100):
     count += 1
     grid.run(total_time=run_time_step)
     E_2_t_unitless = np.array(grid.detectors[1].detector_values()["E"])
@@ -274,7 +294,7 @@ plt.title('S21 ish')
 plt.show()
 
 #Plot E field at port 1
-E_1_t_x = E_1_t[:, 0, 0] #At first spatial step
+E_1_t_x = E_1_t[:, 0, 2] #At first spatial step
 plt.plot(range(len(E_1_t_x)), E_1_t_x)
 plt.title('Port 1 E field.')
 plt.show()
