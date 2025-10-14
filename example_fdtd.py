@@ -13,36 +13,6 @@ from fdtd.boundaries import PML
 from fdtd.conversions import simE_to_worldE, simH_to_worldH, const
 from matplotlib import pyplot as plt
 
-#import sys
-#sys.path.append('../fdtd/fdtd/')
-#from fdtd.sources import SoftArbitraryPointSource
-
-def bound_check_avg(field, num_avg):
-    avg = 0
-    for i in range(num_avg):
-        avg += np.abs(field[i])
-    return avg/num_avg
-
-
-def gaussian_pulse(period: float, width: float, num_steps: int, amplitude: float = 1.0) -> np.ndarray:
-    """
-    Generate a Gaussian pulse centered in the time window.
-
-    Parameters:
-    - period (float): Time between peaks (used to center the pulse).
-    - width (float): Width (standard deviation) of the Gaussian envelope.
-    - num_steps (int): Number of discrete time steps.
-    - amplitude (float): Maximum amplitude of the pulse.
-
-    Returns:
-    - np.ndarray: 1D array representing the Gaussian pulse over time.
-    """
-    t = np.arange(num_steps)
-    t0 = period / 2.0  # Center the pulse around half the period
-    pulse = amplitude * np.exp(-((t - t0) ** 2) / (2 * width ** 2))
-    return pulse
-
-
 def CustomDomainBorder(grid, border_cells, stability=1e-8, extra_z=0):
     #top and bottom
     grid[:, : ,0:border_cells] = PML(a=stability)
@@ -65,7 +35,6 @@ def get_poynting_freq(E_f_x, E_f_y, E_f_z, H_f_x, H_f_y, H_f_z,):
     
     # Compute complex Poynting vector: E × H*
     S_complex = np.cross(E, H_conj)
-    #pudb.set_trace()
     
     # Compute time-averaged (real) Poynting vector: (1/2) Re{E × H*}
     return 0.5 * np.real(S_complex)
@@ -99,14 +68,6 @@ def calc_power(E_field_t, H_field_t, Area):
         H_f_y = np.fft.rfft(H_t_y[:,i])
         H_f_z = np.fft.rfft(H_t_z[:,i])
 
-        #E_f_x = (E_t_x[:,i])
-        #E_f_y = (E_t_y[:,i])
-        #E_f_z = (E_t_z[:,i])
-
-        #H_f_x = (H_t_x[:,i])
-        #H_f_y = (H_t_y[:,i])
-        #H_f_z = (H_t_z[:,i])
-
         S = get_poynting_freq(E_f_x, E_f_y, E_f_z,\
                 H_f_x, H_f_y, H_f_z)
 
@@ -120,11 +81,6 @@ def calc_power(E_field_t, H_field_t, Area):
     return P
 
 fdtd.set_backend("numpy")
-
-#TODO scale wavelength up by e6 and make everything in meters?
-
-min_run_time = 1000 #This is where it appears to level off
-run_time_step = 100
 
 #Constants
 dielectric_const = 4
@@ -149,6 +105,15 @@ outer_dim_y = outer_dim_y_conductor + 2 * pml_size * grid_sp
 conductor_start = pml_size * grid_sp
 extra_z_pml = 10
 
+
+#Simulation duration parameters
+min_run_time = 1000 #This is where it appears to level off
+run_time_step = 100
+thresh = 0.005 #Level at which E field must drop to end simulation
+num_avg = run_time_step
+max_iterations = 10000
+max_run_calls = (max_iterations - 1000) // run_time_step
+
 grid = fdtd.Grid(
     shape = (ceil(outer_dim_x_conductor/grid_sp) + 2*pml_size,\
             ceil(outer_dim_y_conductor/grid_sp) + 2*pml_size,\
@@ -156,21 +121,21 @@ grid = fdtd.Grid(
     grid_spacing=grid_sp,
     permittivity=1.0)
 
-#Add air
-#grid[pml_size:grid.shape[0]//2 - int(microstrip_width / grid_sp),\
-#        pml_size:-pml_size,\
-#        vertical_len - air_size +(pml_size-1) * grid_sp:vertical_len +pml_size * grid_sp]\
-#        = fdtd.AbsorbingObject(permittivity=1, conductivity=0, name="air1")
-#
-#grid[grid.shape[0]//2 + int(microstrip_width / grid_sp):-pml_size,\
-#        pml_size:-pml_size,\
-#        vertical_len - air_size +(pml_size-1) * grid_sp:vertical_len +pml_size * grid_sp]\
-#        = fdtd.AbsorbingObject(permittivity=1, conductivity=0, name="air2")
-#
-#grid[outer_dim_x/2 - microstrip_width/2:outer_dim_x/2 + microstrip_width/2,\
-#        pml_size:-pml_size,\
-#        vertical_len - air_size +pml_size * grid_sp:vertical_len +pml_size * grid_sp]\
-#        = fdtd.AbsorbingObject(permittivity=1, conductivity=0, name="air3")
+#Add air TODO -- is this needed? -- only for conducitivity if so
+grid[pml_size:grid.shape[0]//2 - int(microstrip_width / grid_sp),\
+        pml_size:-pml_size,\
+        vertical_len - air_size +(pml_size-1) * grid_sp:vertical_len +pml_size * grid_sp]\
+        = fdtd.AbsorbingObject(permittivity=1, conductivity=0, name="air1")
+
+grid[grid.shape[0]//2 + int(microstrip_width / grid_sp):-pml_size,\
+        pml_size:-pml_size,\
+        vertical_len - air_size +(pml_size-1) * grid_sp:vertical_len +pml_size * grid_sp]\
+        = fdtd.AbsorbingObject(permittivity=1, conductivity=0, name="air2")
+
+grid[outer_dim_x/2 - microstrip_width/2:outer_dim_x/2 + microstrip_width/2,\
+        pml_size:-pml_size,\
+        vertical_len - air_size +pml_size * grid_sp:vertical_len +pml_size * grid_sp]\
+        = fdtd.AbsorbingObject(permittivity=1, conductivity=0, name="air3")
 
 #Add ground plane
 grid[pml_size:-pml_size,\
@@ -191,21 +156,13 @@ grid[outer_dim_x/2 - microstrip_width/2:outer_dim_x/2 + microstrip_width/2,\
         microstrip_vertical_start:microstrip_vertical_start + conductor_thickness]\
         = fdtd.AbsorbingObject(permittivity=1, conductivity=5.8e8, name="conductor")
 
-
-#Add source at far left side (Sx1
-#grid[outer_dim_x/2 - microstrip_width/2:outer_dim_x/2 + microstrip_width/2,\
-#        pml_size,\
-#        microstrip_vertical_start:microstrip_vertical_start + conductor_thickness]\
-#        = fdtd.LineSource(period = 1/max_freq, name="source", pulse=True, cycle=10, hanning_dt=1e14/max_freq)
+#Add source at port 1
+#pulse size = t1 = int(2 * pi / (frequency * hanning_dt / cycle)); where frequency is in step size
 grid[outer_dim_x/2 - microstrip_width/2:outer_dim_x/2 + microstrip_width/2,\
-        #grid[pml_size:-pml_size,\
-        #grid[pml_size:pml_size+20,\
         pml_size,\
-        #conductor_start:microstrip_vertical_start + conductor_thickness]\
         microstrip_vertical_start:microstrip_vertical_start + conductor_thickness]\
-        = fdtd.LineSource(period = 1/max_freq, name="source", pulse=True, cycle=10, hanning_dt=10.0)#/max_freq)
+        = fdtd.LineSource(period = 1/max_freq, name="source", pulse=True, cycle=10, hanning_dt=10.0)
 
-        #pulse size = t1 = int(2 * pi / (self.frequency * self.hanning_dt / self.cycle)) ; where frequency is in step size
 
 #Add detector at far left side (Port 1)
 grid[outer_dim_x/2 - microstrip_width/2:outer_dim_x/2 + microstrip_width/2,\
@@ -215,12 +172,12 @@ grid[outer_dim_x/2 - microstrip_width/2:outer_dim_x/2 + microstrip_width/2,\
 
 #Add detector at far right side (Port 2)
 grid[outer_dim_x/2 - microstrip_width/2:outer_dim_x/2 + microstrip_width/2,\
-        -pml_size -3,\
+        -pml_size -1,\
         microstrip_vertical_start:microstrip_vertical_start + conductor_thickness]\
         = fdtd.LineDetector(name="port2")
 
 #Box of size 2
-CustomDomainBorder(grid, pml_size, 1e-6, extra_z_pml)  
+CustomDomainBorder(grid, pml_size, 1e-8, extra_z_pml)  
 
 #Show setup 
 grid.visualize(z=0, show=True)
@@ -234,27 +191,26 @@ grid.run(total_time=min_run_time)
 #Get E and H field from port 2
 E_2_t_unitless = np.array(grid.detectors[1].detector_values()["E"])
 
-thresh = 0.005
-num_avg = run_time_step // 2
 recent_E2 = max(np.abs(E_2_t_unitless[-num_avg:, 0, 0]))
-print(recent_E2)
-print(np.max(E_2_t_unitless[:,0,0]))
 count = 0
-while(recent_E2 > thresh * np.max(E_2_t_unitless[:,0,0]) and count < 100):
-    count += 1
+while(recent_E2 > thresh * np.max(E_2_t_unitless[:,0,0])\
+        and count < max_run_calls):
+
+    #Run simulation additional steps
     grid.run(total_time=run_time_step)
+
+    #Recompute new max
     E_2_t_unitless = np.array(grid.detectors[1].detector_values()["E"])
     recent_E2 = max(np.abs(E_2_t_unitless[-num_avg:, 0, 0]))
-    print(recent_E2)
-    print(np.max(E_2_t_unitless[:,0,0]))
+    count += 1
 
+#Fetch port 2 H field
 H_2_t_unitless = grid.detectors[1].detector_values()["H"]
 
 #Show setup 
 grid.visualize(z=0, show=True)
 grid.visualize(x=0, show=True)
 grid.visualize(y=0, show=True)
-
 
 #Normalize field quantities
 E_2_t = np.array([simE_to_worldE(x) for x in E_2_t_unitless])
@@ -270,7 +226,11 @@ plt.show()
 P2 = calc_power(E_2_t, H_2_t,\
         microstrip_width * conductor_thickness)
 
-plt.plot(range(len(P2)), P2)
+#Calculate frequency array
+freq_array = np.fft.rfftfreq(2 * len(P2) - 1, grid.time_step) / 1e9
+
+#Plot P2 as a function of frequency
+plt.plot(freq_array, P2)
 plt.title('P2')
 plt.show()
 
@@ -284,12 +244,12 @@ H_1_t = np.array([simH_to_worldH(x) for x in H_1_t_unitless])
 
 P1 = calc_power(E_1_t, H_1_t,\
         microstrip_width * conductor_thickness)
-plt.plot(range(len(P1)), P1)
+plt.plot(freq_array, P1)
 plt.title('P1')
 plt.show()
 
 mag_S21_sq = np.abs(P2 / P1)
-plt.plot(range(len(mag_S21_sq)), mag_S21_sq)
+plt.plot(freq_array, mag_S21_sq)
 plt.title('S21 ish')
 plt.show()
 
