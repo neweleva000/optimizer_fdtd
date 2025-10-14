@@ -60,13 +60,13 @@ def calc_power(E_field_t, H_field_t, Area):
     #Shift to frequency domain and calculate 
     #power via integral of poynting vector
     for i in range(spatial_steps):
-        E_f_x = np.fft.rfft(E_t_x[:,i])
-        E_f_y = np.fft.rfft(E_t_y[:,i])
-        E_f_z = np.fft.rfft(E_t_z[:,i])
+        E_f_x = np.fft.rfft(E_t_x[:,i]) / E_t_x.shape[0]
+        E_f_y = np.fft.rfft(E_t_y[:,i]) / E_t_y.shape[0]
+        E_f_z = np.fft.rfft(E_t_z[:,i]) / E_t_z.shape[0]
 
-        H_f_x = np.fft.rfft(H_t_x[:,i])
-        H_f_y = np.fft.rfft(H_t_y[:,i])
-        H_f_z = np.fft.rfft(H_t_z[:,i])
+        H_f_x = np.fft.rfft(H_t_x[:,i]) / H_t_x.shape[0]
+        H_f_y = np.fft.rfft(H_t_y[:,i]) / H_t_y.shape[0]
+        H_f_z = np.fft.rfft(H_t_z[:,i]) / H_t_z.shape[0]
 
         S = get_poynting_freq(E_f_x, E_f_y, E_f_z,\
                 H_f_x, H_f_y, H_f_z)
@@ -103,8 +103,7 @@ microstrip_width = 40e-6
 outer_dim_x = outer_dim_x_conductor + 2 * pml_size * grid_sp
 outer_dim_y = outer_dim_y_conductor + 2 * pml_size * grid_sp
 conductor_start = pml_size * grid_sp
-extra_z_pml = 10
-
+extra_z_pml = 5
 
 #Simulation duration parameters
 min_run_time = 1000 #This is where it appears to level off
@@ -248,9 +247,10 @@ plt.plot(freq_array, P1)
 plt.title('P1')
 plt.show()
 
-mag_S21_sq = np.abs(P2 / P1)
+#mag_S21_sq = (np.sqrt(P2 / P1))
+mag_S21_sq = ((P2 / P1))
 plt.plot(freq_array, mag_S21_sq)
-plt.title('S21 ish')
+plt.title('S21')
 plt.show()
 
 #Plot E field at port 1
