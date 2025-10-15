@@ -182,9 +182,7 @@ grid[outer_dim_x/2 - microstrip_width/2:outer_dim_x/2 + microstrip_width/2,\
         = fdtd.LineDetector(name="port2")
 
 #Box of size 2
-#CustomDomainBorder(grid, pml_size, 1e-8, extra_z_pml)  
-#CustomDomainBorder(grid, pml_size, 1e-1, extra_z_pml)  
-CustomDomainBorder(grid, pml_size, 10, extra_z_pml)  
+CustomDomainBorder(grid, pml_size, 1e-8, extra_z_pml)  
 
 #Show setup 
 grid.visualize(z=0, show=True)
