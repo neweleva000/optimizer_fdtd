@@ -163,7 +163,7 @@ grid[outer_dim_x/2 - microstrip_width/2:outer_dim_x/2 + microstrip_width/2,\
 #Add source at port 1
 #pulse size = t1 = int(2 * pi / (frequency * hanning_dt / cycle)); where frequency is in step size
 grid[outer_dim_x/2,\
-        pml_size,\
+        pml_size + 1,\
         microstrip_vertical_start + conductor_thickness + grid_sp]\
         = fdtd.PointSource(period = 3/max_freq, name="source", pulse=True, cycle=10, hanning_dt=10.0)
 
@@ -267,3 +267,17 @@ plt.show()
 plt.plot(np.fft.fftfreq(len(E_1_t_x), grid.time_step), np.abs(np.fft.fft(E_1_t_x)))
 plt.show()
 
+
+#Ratio of field quantities
+E_1_t_y = E_1_t[:, 0, 1] #At first spatial step
+E_2_t_y = E_2_t[:, 0, 1] #At first spatial step
+
+E_1_f_y = np.fft.rfft(E_1_t_y)
+E_2_f_y = np.fft.rfft(E_2_t_y)
+
+S21B = E_2_f_y / E_1_f_y
+
+#freq_array = np.fft.rfftfreq(2 * len(S21B) - 1, grid.time_step) / 1e9
+plt.plot(freq_array, np.abs(S21B))
+plt.title("Field based S21")
+plt.show()
