@@ -2,15 +2,19 @@ import pudb
 #import fdtd #Error on grid placement for source
 
 import sys
-sys.path.append('../fdtd')
+sys.path.append('./fdtd')
 import fdtd_local as fdtd
 
+print(fdtd.boundaries)
 
 import numpy as np
 from math import sqrt, ceil, floor
-from fdtd.boundaries import DomainBorderPML
-from fdtd.boundaries import PML
-from fdtd.conversions import simE_to_worldE, simH_to_worldH, const
+#from fdtd.boundaries import DomainBorderPML
+from fdtd_local.boundaries import DomainBorderPML
+#from fdtd.boundaries import PML
+from fdtd_local.boundaries import PML 
+#from fdtd.conversions import simE_to_worldE, simH_to_worldH, const
+from fdtd_local.conversions import simE_to_worldE, simH_to_worldH, const
 from matplotlib import pyplot as plt
 
 def CustomDomainBorder(grid, border_cells, stability=1e-8, extra_z=0):
