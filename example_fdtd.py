@@ -1,5 +1,5 @@
 import pudb
-#import fdtd
+#import fdtd #Error on grid placement for source
 
 import sys
 sys.path.append('../fdtd')
@@ -104,7 +104,7 @@ outer_dim_x = outer_dim_x_conductor + 2 * pml_size * grid_sp
 outer_dim_y = outer_dim_y_conductor + 2 * pml_size * grid_sp
 conductor_start = pml_size * grid_sp
 extra_z_pml = 0
-horizontal_port_offset = 5
+horizontal_port_offset = 5 #TODO
 
 #Simulation duration parameters
 min_run_time = 5000 
@@ -163,7 +163,7 @@ grid[outer_dim_x/2 - microstrip_width/2:outer_dim_x/2 + microstrip_width/2,\
 #Add source at port 1
 #pulse size = t1 = int(2 * pi / (frequency * hanning_dt / cycle)); where frequency is in step size
 grid[outer_dim_x/2,\
-        pml_size + 1,\
+        pml_size + horizontal_port_offset,\
         microstrip_vertical_start + conductor_thickness + grid_sp]\
         = fdtd.PointSource(period = 3/max_freq, name="source", pulse=True, cycle=10, hanning_dt=10.0)
 
@@ -236,6 +236,7 @@ freq_array = np.fft.rfftfreq(2 * len(P2) - 1, grid.time_step) / 1e9
 #Plot P2 as a function of frequency
 plt.plot(freq_array, P2)
 plt.title('P2')
+plt.xlim((0,250))
 plt.show()
 
 #Fetch field quantities from port 1
@@ -250,12 +251,14 @@ P1 = calc_power(E_1_t, H_1_t,\
         microstrip_width * conductor_thickness)
 plt.plot(freq_array, P1)
 plt.title('P1')
+plt.xlim((0,250))
 plt.show()
 
 mag_S21_sq = (np.sqrt(P2 / P1))
 #mag_S21_sq = ((P2 / P1))
 plt.plot(freq_array, mag_S21_sq)
 plt.title('|S21|')
+plt.xlim((0,250))
 plt.show()
 
 #Plot E field at port 1
@@ -265,8 +268,8 @@ plt.title('Port 1 E field.')
 plt.show()
 
 plt.plot(np.fft.fftfreq(len(E_1_t_x), grid.time_step), np.abs(np.fft.fft(E_1_t_x)))
+plt.xlim((0,250))
 plt.show()
-
 
 #Ratio of field quantities
 E_1_t_y = E_1_t[:, 0, 1] #At first spatial step
@@ -277,7 +280,71 @@ E_2_f_y = np.fft.rfft(E_2_t_y)
 
 S21B = E_2_f_y / E_1_f_y
 
+E_2_t_z = E_2_t[:, 0, 2] 
+E_2_f_z = np.fft.rfft(E_2_t_z)
+H_2_t_x = H_2_t[:, 0, 0] 
+H_2_f_x = np.fft.rfft(H_2_t_x)
+Zc = E_2_f_z / H_2_f_x 
+plt.plot(freq_array, np.real(Zc))
+plt.plot(freq_array, np.imag(Zc))
+plt.show()
+
+E_2_t_x = E_2_t[:, 0, 0] 
+E_2_f_x = np.fft.rfft(E_2_t_x)
+E_2_t_y = E_2_t[:, 0, 1] 
+E_2_f_y = np.fft.rfft(E_2_t_y)
+E_2_t_z = E_2_t[:, 0, 2] 
+E_2_f_z = np.fft.rfft(E_2_t_z)
+
+H_2_t_x = H_2_t[:, 0, 0] 
+H_2_f_x = np.fft.rfft(H_2_t_x)
+H_2_t_y = H_2_t[:, 0, 1] 
+H_2_f_y = np.fft.rfft(H_2_t_y)
+H_2_t_z = E_2_t[:, 0, 2] 
+H_2_f_z = np.fft.rfft(H_2_t_z)
+
+plt.plot(freq_array, E_2_f_x, label="Ex")
+plt.plot(freq_array, E_2_f_y, label="Ey")
+plt.plot(freq_array, E_2_f_z, label="Ez")
+plt.plot(freq_array, H_2_f_x, label="Hx")
+plt.plot(freq_array, H_2_f_y, label="Hy")
+plt.plot(freq_array, H_2_f_z, label="Hz")
+plt.legend()
+plt.xlim((0,250))
+plt.show()
+
+plt.plot(freq_array, np.abs(H_2_f_z), label='Mag')
+plt.plot(freq_array, np.abs(E_2_f_x), label='Ele')
+plt.legend()
+plt.show()
+
+Zc = E_2_f_x / H_2_f_z 
+plt.plot(freq_array, np.real(Zc))
+plt.plot(freq_array, np.imag(Zc))
+plt.show()
+
+E_2_mag_f = np.sqrt(E_2_f_x **2 + E_2_f_y **2 + E_2_f_z ** 2) 
+H_2_mag_f = np.sqrt(H_2_f_x **2 + H_2_f_y **2 + H_2_f_z ** 2) 
+
+Zc2 = E_2_mag_f / H_2_mag_f
+plt.plot(freq_array, np.real(Zc2))
+plt.plot(freq_array, np.imag(Zc2))
+plt.title("Input impedance")
+plt.show()
+
+S21B_50 = S21B * np.sqrt(np.abs(np.real(Zc)) / 50)
+plt.plot(freq_array, S21B_50)
+plt.xlim((0,250))
+plt.show()
+
+S21C_50 = mag_S21_sq * np.sqrt(np.abs(np.real(Zc)) / 50)
+plt.plot(freq_array, S21C_50)
+plt.xlim((0,250))
+plt.show()
+
+
 #freq_array = np.fft.rfftfreq(2 * len(S21B) - 1, grid.time_step) / 1e9
 plt.plot(freq_array, np.abs(S21B))
+plt.xlim((0,250))
 plt.title("Field based S21")
 plt.show()
