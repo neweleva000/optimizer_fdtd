@@ -235,7 +235,7 @@ freq_array = np.fft.rfftfreq(2 * len(P2) - 1, grid.time_step) / 1e9
 
 #Plot P2 as a function of frequency
 plt.plot(freq_array, P2)
-plt.title('P2')
+plt.title('Port 2 Power')
 plt.xlim((0,250))
 plt.show()
 
@@ -250,7 +250,7 @@ H_1_t = np.array([simH_to_worldH(x) for x in H_1_t_unitless])
 P1 = calc_power(E_1_t, H_1_t,\
         microstrip_width * conductor_thickness)
 plt.plot(freq_array, P1)
-plt.title('P1')
+plt.title('Port 1 Power')
 plt.xlim((0,250))
 plt.show()
 
@@ -267,10 +267,6 @@ plt.plot(range(len(E_1_t_x)), E_1_t_x)
 plt.title('Port 1 E field.')
 plt.show()
 
-plt.plot(np.fft.fftfreq(len(E_1_t_x), grid.time_step), np.abs(np.fft.fft(E_1_t_x)))
-plt.xlim((0,250))
-plt.show()
-
 #Ratio of field quantities
 E_1_t_y = E_1_t[:, 0, 1] #At first spatial step
 E_2_t_y = E_2_t[:, 0, 1] #At first spatial step
@@ -279,7 +275,12 @@ E_1_f_y = np.fft.rfft(E_1_t_y)
 E_2_f_y = np.fft.rfft(E_2_t_y)
 
 S21B = E_2_f_y / E_1_f_y
+plt.plot(freq_array, np.abs(S21B))
+plt.xlim((0,250))
+plt.title("Field based S21")
+plt.show()
 
+#Derive impedance from normal fields
 E_2_t_z = E_2_t[:, 0, 2] 
 E_2_f_z = np.fft.rfft(E_2_t_z)
 H_2_t_x = H_2_t[:, 0, 0] 
@@ -287,8 +288,10 @@ H_2_f_x = np.fft.rfft(H_2_t_x)
 Zc = E_2_f_z / H_2_f_x 
 plt.plot(freq_array, np.real(Zc))
 plt.plot(freq_array, np.imag(Zc))
+plt.title('Input impedance as ratio of normal fields.')
 plt.show()
 
+#Frequency domain port 2 fields
 E_2_t_x = E_2_t[:, 0, 0] 
 E_2_f_x = np.fft.rfft(E_2_t_x)
 E_2_t_y = E_2_t[:, 0, 1] 
@@ -313,16 +316,7 @@ plt.legend()
 plt.xlim((0,250))
 plt.show()
 
-plt.plot(freq_array, np.abs(H_2_f_z), label='Mag')
-plt.plot(freq_array, np.abs(E_2_f_x), label='Ele')
-plt.legend()
-plt.show()
-
-Zc = E_2_f_x / H_2_f_z 
-plt.plot(freq_array, np.real(Zc))
-plt.plot(freq_array, np.imag(Zc))
-plt.show()
-
+#Compute input impedance from field magnitudes
 E_2_mag_f = np.sqrt(E_2_f_x **2 + E_2_f_y **2 + E_2_f_z ** 2) 
 H_2_mag_f = np.sqrt(H_2_f_x **2 + H_2_f_y **2 + H_2_f_z ** 2) 
 
@@ -332,6 +326,7 @@ plt.plot(freq_array, np.imag(Zc2))
 plt.title("Input impedance")
 plt.show()
 
+#Scale derived s parameters by input impedance
 S21B_50 = S21B * np.sqrt(np.abs(np.real(Zc)) / 50)
 plt.plot(freq_array, S21B_50)
 plt.xlim((0,250))
@@ -340,11 +335,11 @@ plt.show()
 S21C_50 = mag_S21_sq * np.sqrt(np.abs(np.real(Zc)) / 50)
 plt.plot(freq_array, S21C_50)
 plt.xlim((0,250))
+plt.title('S21 scaled by field quantity')
 plt.show()
 
-
-#freq_array = np.fft.rfftfreq(2 * len(S21B) - 1, grid.time_step) / 1e9
-plt.plot(freq_array, np.abs(S21B))
+S21C_50 = mag_S21_sq * np.sqrt(np.abs(np.real(Zc2)) / 50)
+plt.plot(freq_array, S21C_50)
 plt.xlim((0,250))
-plt.title("Field based S21")
+plt.title('S21 scaled by magnitude field quantity')
 plt.show()
