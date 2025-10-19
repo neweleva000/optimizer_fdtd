@@ -2,7 +2,7 @@ import pudb
 #import fdtd #Error on grid placement for source
 
 import sys
-sys.path.append('./fdtd')
+sys.path.append('.')
 import fdtd_local as fdtd
 
 print(fdtd.boundaries)

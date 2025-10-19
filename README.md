@@ -5,7 +5,7 @@ pip install -r requirements.txt <br>
 
 # Run
 #Example microstrip -- Parameters to adjust grid dimensions are at the top of the python script
-python3 example\_fdtd.py
+<br>python3 example\_fdtd.py
 
 #Plot EMX
 cd emx\_comparison
